@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-patch-risk-checker"
+version = "0.1.0"
+description = "Offline CLI for reviewing AI-generated patch risk before PRs and CI merges."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "ai-patch-risk-checker contributors" }
+]
+keywords = ["ai", "codex", "claude-code", "patch", "code-review", "ci", "developer-tools"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Version Control",
+  "Topic :: Utilities"
+]
+
+[project.scripts]
+aipatchrisk = "ai_patch_risk_checker.cli:main"
+ai-patch-risk-checker = "ai_patch_risk_checker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ai_patch_risk_checker = ["py.typed"]

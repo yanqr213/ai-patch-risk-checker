@@ -1,0 +1,11 @@
+diff --git a/src/auth/session.py b/src/auth/session.py
+index 1111111..2222222 100644
+--- a/src/auth/session.py
++++ b/src/auth/session.py
+@@ -1,5 +1,8 @@
+ def create_session(user):
+-    return {"user_id": user.id}
++    return {
++        "user_id": user.id,
++        "expires_in": 86400,
++    }

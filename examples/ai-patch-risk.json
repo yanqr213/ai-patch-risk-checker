@@ -1,0 +1,11 @@
+{
+  "fail_on": "high",
+  "large_change_lines": 500,
+  "min_test_required_for_code": true,
+  "require_tests_for_categories": ["auth", "database", "payments", "dependencies", "ci"],
+  "categories": {
+    "auth": ["auth/*", "*/auth/*", "*session*", "*oauth*"],
+    "database": ["migrations/*", "*/migrations/*", "*.sql"],
+    "dependencies": ["pyproject.toml", "package.json", "package-lock.json"]
+  }
+}
