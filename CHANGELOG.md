@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 - 2026-06-08
+
+- Added reviewed baseline files for known AI patch risk findings.
+- Added the `baseline` CLI command and `--baseline` filtering for `analyze`, `check`, and `inspect`.
+- Added stable finding fingerprints to JSON, CSV, and SARIF outputs.
+- Updated CI smoke coverage to verify baseline generation and filtering.
+
 ## 0.2.0 - 2026-06-08
 
 - Added SARIF 2.1.0 output for GitHub Code Scanning and security platform ingestion.

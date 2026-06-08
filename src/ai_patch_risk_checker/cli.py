@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterable
 
 from . import __version__
+from .baseline import apply_baseline, load_baseline, render_baseline
 from .config import default_config_json, load_config
 from .diff_parser import parse_unified_diff
 from .report import render_csv, render_json, render_markdown, render_sarif
@@ -27,6 +28,20 @@ def main(argv: Iterable[str] | None = None) -> int:
     diff_text = read_diff(args)
     files = parse_unified_diff(diff_text)
     report = analyze_patch(files, config)
+
+    if args.command == "baseline":
+        output = render_baseline(report)
+        if args.output == "-":
+            print(output, end="")
+        elif args.output:
+            Path(args.output).write_text(output, encoding="utf-8")
+            print(f"Wrote baseline: {args.output}")
+        else:
+            print(output, end="")
+        return 0
+
+    if getattr(args, "baseline", None):
+        report = apply_baseline(report, load_baseline(Path(args.baseline)))
 
     if args.command == "inspect":
         print(render_json(report), end="")
@@ -55,8 +70,16 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--git", action="store_true", help="Read diff from `git diff --cached` or `git diff`.")
         cmd.add_argument("--staged", action="store_true", help="When --git is used, read staged diff.")
         cmd.add_argument("--config", help="Optional JSON config file.")
+        cmd.add_argument("--baseline", help="Optional baseline JSON. Matching findings are suppressed before reporting and CI exit checks.")
         cmd.add_argument("--format", choices=["markdown", "json", "csv", "sarif"], default="markdown", help="Report format.")
         cmd.add_argument("--output", help="Write report to file.")
+
+    baseline = sub.add_parser("baseline", help="Write a reviewed baseline JSON from current findings.")
+    baseline.add_argument("--diff", help="Path to unified diff. Use '-' or omit to read stdin.")
+    baseline.add_argument("--git", action="store_true", help="Read diff from `git diff --cached` or `git diff`.")
+    baseline.add_argument("--staged", action="store_true", help="When --git is used, read staged diff.")
+    baseline.add_argument("--config", help="Optional JSON config file.")
+    baseline.add_argument("--output", default="ai-patch-risk-baseline.json", help="Baseline output path. Use '-' to print to stdout.")
 
     init = sub.add_parser("init-config", help="Write a default JSON config.")
     init.add_argument("--output", default="ai-patch-risk.json", help="Config output path.")

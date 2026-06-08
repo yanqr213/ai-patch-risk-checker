@@ -7,6 +7,7 @@ import io
 import json
 from typing import Dict
 
+from . import __version__
 from .models import FileChange, Finding, PatchReport
 
 
@@ -29,18 +30,24 @@ def render_markdown(report: PatchReport) -> str:
         f"- Deletions: {report.summary['deletions']}",
         f"- Risk level: {report.summary['risk_level']}",
         f"- Findings: {report.summary['finding_count']}",
+        f"- Suppressed by baseline: {report.summary.get('suppressed_finding_count', 0)}",
         "",
         "## Findings",
         "",
     ]
     if report.findings:
-        lines.extend(["| Severity | Code | Message | Paths | Recommendation |", "| --- | --- | --- | --- | --- |"])
+        lines.extend(["| Severity | Code | Fingerprint | Message | Paths | Recommendation |", "| --- | --- | --- | --- | --- | --- |"])
         for finding in report.findings:
             lines.append(
-                f"| {finding.severity} | `{finding.code}` | {escape_pipe(finding.message)} | {escape_pipe(', '.join(finding.paths))} | {escape_pipe(finding.recommendation)} |"
+                f"| {finding.severity} | `{finding.code}` | `{finding.fingerprint}` | {escape_pipe(finding.message)} | {escape_pipe(', '.join(finding.paths))} | {escape_pipe(finding.recommendation)} |"
             )
     else:
         lines.append("_No findings._")
+
+    if report.suppressed_findings:
+        lines.extend(["", "## Suppressed By Baseline", "", "| Severity | Code | Fingerprint | Paths |", "| --- | --- | --- | --- |"])
+        for finding in report.suppressed_findings:
+            lines.append(f"| {finding.severity} | `{finding.code}` | `{finding.fingerprint}` | {escape_pipe(', '.join(finding.paths))} |")
 
     lines.extend(["", "## Changed Files", "", "| Path | Status | + | - |", "| --- | --- | ---: | ---: |"])
     for file in report.files:
@@ -59,9 +66,11 @@ def render_csv(report: PatchReport) -> str:
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["severity", "code", "message", "paths", "recommendation"])
+    writer.writerow(["status", "severity", "code", "fingerprint", "message", "paths", "recommendation"])
     for finding in report.findings:
-        writer.writerow([finding.severity, finding.code, finding.message, "|".join(finding.paths), finding.recommendation])
+        writer.writerow(["open", finding.severity, finding.code, finding.fingerprint, finding.message, "|".join(finding.paths), finding.recommendation])
+    for finding in report.suppressed_findings:
+        writer.writerow(["suppressed", finding.severity, finding.code, finding.fingerprint, finding.message, "|".join(finding.paths), finding.recommendation])
     return buffer.getvalue()
 
 
@@ -94,6 +103,7 @@ def render_sarif(report: PatchReport) -> str:
                     "ruleId": finding.code,
                     "level": _sarif_level(finding.severity),
                     "message": {"text": f"{finding.message} Recommendation: {finding.recommendation}".strip()},
+                    "partialFingerprints": {"aiPatchRisk/v1": finding.fingerprint},
                     "locations": [
                         {
                             "physicalLocation": {
@@ -114,15 +124,18 @@ def render_sarif(report: PatchReport) -> str:
                 "tool": {
                     "driver": {
                         "name": "ai-patch-risk-checker",
+                        "semanticVersion": __version__,
                         "informationUri": "https://github.com/yanqr213/ai-patch-risk-checker",
                         "rules": [rules[key] for key in sorted(rules)],
                     }
                 },
+                "automationDetails": {"id": "ai-patch-risk-checker"},
                 "results": results,
                 "properties": {
                     "summary": report.summary,
                     "touched_categories": report.touched_categories,
                     "test_paths": report.test_paths,
+                    "suppressed_findings": [finding_to_dict(finding) for finding in report.suppressed_findings],
                 },
             }
         ],
@@ -136,6 +149,7 @@ def to_dict(report: PatchReport) -> Dict[str, object]:
     return {
         "summary": report.summary,
         "findings": [finding_to_dict(finding) for finding in report.findings],
+        "suppressed_findings": [finding_to_dict(finding) for finding in report.suppressed_findings],
         "files": [file_to_dict(file) for file in report.files],
         "touched_categories": report.touched_categories,
         "test_paths": report.test_paths,
@@ -149,6 +163,7 @@ def finding_to_dict(finding: Finding) -> Dict[str, object]:
         "message": finding.message,
         "paths": finding.paths,
         "recommendation": finding.recommendation,
+        "fingerprint": finding.fingerprint,
     }
 
 

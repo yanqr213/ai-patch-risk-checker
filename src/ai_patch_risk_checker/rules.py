@@ -6,6 +6,7 @@ import re
 from fnmatch import fnmatchcase
 from typing import Dict, Iterable, List, Sequence
 
+from .baseline import attach_fingerprints
 from .models import CheckConfig, FileChange, Finding, PatchReport
 
 SEVERITY_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
@@ -44,8 +45,9 @@ def analyze_patch(files: Sequence[FileChange], config: CheckConfig) -> PatchRepo
         "risk_level": max_severity(findings),
         "finding_count": len(findings),
         "high_or_above": sum(1 for finding in findings if severity_at_least(finding.severity, "high")),
+        "suppressed_finding_count": 0,
     }
-    return PatchReport(files=list(files), findings=findings, touched_categories=touched, test_paths=test_paths, summary=summary)
+    return attach_fingerprints(PatchReport(files=list(files), findings=findings, touched_categories=touched, test_paths=test_paths, summary=summary))
 
 
 def categorize_files(files: Iterable[FileChange], config: CheckConfig) -> Dict[str, List[str]]:

@@ -22,6 +22,7 @@
 - 输出 Markdown、JSON、CSV、SARIF 报告。
 - SARIF 可直接上传到 GitHub Code Scanning，让 AI 补丁风险出现在仓库安全/代码扫描视图里。
 - `check` 模式可按严重度阈值返回非零退出码，用于 CI。
+- baseline 文件可记录团队已审阅的历史风险，CI 只拦截 AI 补丁引入的新风险。
 - JSON 配置可覆盖阈值、类别路径和需要测试的类别。
 - 仅使用 Python 标准库，无需网络。
 
@@ -83,6 +84,13 @@ aipatchrisk check --git --staged
 git diff --cached | aipatchrisk check --format markdown
 ```
 
+生成并使用已知风险 baseline：
+
+```bash
+aipatchrisk baseline --diff examples/auth-without-tests.diff --output ai-patch-risk-baseline.json
+aipatchrisk check --diff examples/auth-without-tests.diff --baseline ai-patch-risk-baseline.json
+```
+
 ## 配置
 
 生成默认配置：
@@ -113,6 +121,24 @@ aipatchrisk init-config --output ai-patch-risk.json
 aipatchrisk check --git --config ai-patch-risk.json
 ```
 
+## Baseline 工作流
+
+baseline 是一个可审阅、可提交的 JSON 文件，用来记录团队已经接受或排期处理的既有 finding。它不会关闭规则，只会按稳定 fingerprint 压制已知项，让 CI 专注拦截新增风险。
+
+```bash
+aipatchrisk baseline --git --staged --output ai-patch-risk-baseline.json
+aipatchrisk check --git --staged --baseline ai-patch-risk-baseline.json --format json --output patch-risk.json
+```
+
+建议流程：
+
+1. 首次接入时生成 `ai-patch-risk-baseline.json`。
+2. 人工审阅 baseline 中的 `code`、`severity`、`paths` 和 `fingerprint`。
+3. 把 baseline 文件提交到仓库。
+4. CI 中使用 `--baseline ai-patch-risk-baseline.json`，只让新增风险导致失败。
+
+过滤后的 JSON、Markdown、CSV 和 SARIF 仍会保留 suppressed 信息，例如 `suppressed_finding_count` 或 `suppressed_findings`，方便后续逐步清理技术债。
+
 ## 风险规则
 
 | Code | Severity | 说明 |
@@ -129,6 +155,8 @@ aipatchrisk check --git --config ai-patch-risk.json
 | `generated_or_lockfile_changed` | low | 锁文件、构建输出或生成物发生变化 |
 
 严重度是 review 线索，不代表 bug 一定存在。工具目的是把 AI 补丁的审查重点提前暴露出来。
+
+每条 finding 都会带一个稳定 `fingerprint`，由规则 code 和归一化路径生成。它可用于 baseline、审计表格或外部质量平台去重。
 
 ## 输出
 
@@ -156,6 +184,18 @@ SARIF 报告适合接入 GitHub Code Scanning：
 aipatchrisk check --diff patch.diff --format sarif --output patch-risk.sarif
 ```
 
+baseline 过滤后的 JSON 会保留压制摘要：
+
+```json
+{
+  "summary": {
+    "finding_count": 0,
+    "suppressed_finding_count": 2,
+    "risk_level": "none"
+  }
+}
+```
+
 ## CI 用法
 
 GitHub Actions 示例：
@@ -164,7 +204,7 @@ GitHub Actions 示例：
 - name: Check AI patch risk
   run: |
     git diff origin/main...HEAD > patch.diff
-    python -m ai_patch_risk_checker.cli check --diff patch.diff --format markdown --output patch-risk.md
+    python -m ai_patch_risk_checker.cli check --diff patch.diff --baseline ai-patch-risk-baseline.json --format markdown --output patch-risk.md
 ```
 
 如果风险级别达到配置中的 `fail_on`，`check` 会返回非零退出码。
@@ -196,11 +236,21 @@ steps:
 
 如果你只想把报告上传但暂不阻断合并，可以在 `ai-patch-risk.json` 中把 `fail_on` 设为 `critical`，或把 `check` 换成 `analyze`。
 
+CI 中消费已提交 baseline：
+
+```yaml
+- name: Fail only on new AI patch risks
+  run: aipatchrisk check --diff patch.diff --baseline ai-patch-risk-baseline.json --format json --output patch-risk.json
+```
+
+不要在同一个阻断型 CI run 里现生成 baseline 再过滤当前 diff；baseline 应该在接入或风险复核后由维护者提交。
+
 ## 隐私与安全
 
 - 工具只读取本地 diff，不联网，不上传代码。
 - 工具不会读取、请求或推送 GitHub token。
 - 密钥检测是启发式，不替代专门的 secret scanner。
+- baseline 是审计文件，不是忽略规则；请像维护测试快照一样审阅它。
 - 如果报告进入 PR 或工单，请确认其中没有业务敏感上下文。
 - 如果检测到真实凭证，请删除补丁里的凭证并轮换。
 
@@ -227,6 +277,7 @@ It helps teams using Codex, Claude Code, Cursor, ChatGPT, and similar coding age
 - Emits Markdown, JSON, CSV, and SARIF reports.
 - Uploads SARIF to GitHub Code Scanning so AI patch risks show up where maintainers already review security and quality alerts.
 - Provides a `check` mode with severity-based exit codes for CI.
+- Supports reviewed baseline files so teams can fail CI only on newly introduced AI patch risks.
 - Uses only the Python standard library and does not require network access.
 
 ### Quick Start
@@ -254,11 +305,36 @@ Write SARIF for code scanning:
 aipatchrisk check --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
 ```
 
+Create and use a baseline:
+
+```bash
+aipatchrisk baseline --diff examples/auth-without-tests.diff --output ai-patch-risk-baseline.json
+aipatchrisk check --diff examples/auth-without-tests.diff --baseline ai-patch-risk-baseline.json
+```
+
+### Baselines
+
+Baselines are reviewed JSON files containing known finding fingerprints. They are useful when a team wants to adopt the checker on an existing repository without failing CI for every previously accepted risk.
+
+```bash
+aipatchrisk baseline --git --staged --output ai-patch-risk-baseline.json
+aipatchrisk check --git --staged --baseline ai-patch-risk-baseline.json --format json --output patch-risk.json
+```
+
+A practical rollout is:
+
+1. Generate `ai-patch-risk-baseline.json` for the current diff or staged change.
+2. Review the finding codes, severities, paths, and fingerprints.
+3. Commit the baseline file.
+4. Run CI with `--baseline ai-patch-risk-baseline.json` so only new findings fail the build.
+
+JSON, CSV, Markdown, and SARIF outputs include finding fingerprints. Filtered reports also keep suppressed finding metadata through `suppressed_finding_count` and `suppressed_findings`.
+
 ### CI
 
 ```bash
 git diff origin/main...HEAD > patch.diff
-python -m ai_patch_risk_checker.cli check --diff patch.diff --format json --output patch-risk.json
+python -m ai_patch_risk_checker.cli check --diff patch.diff --baseline ai-patch-risk-baseline.json --format json --output patch-risk.json
 ```
 
 `check` returns a non-zero exit code when the highest finding severity is at or above `fail_on`.

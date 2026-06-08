@@ -37,6 +37,7 @@ class Finding:
     message: str
     paths: List[str] = field(default_factory=list)
     recommendation: str = ""
+    fingerprint: str = ""
 
 
 @dataclass
@@ -48,6 +49,7 @@ class PatchReport:
     touched_categories: Dict[str, List[str]]
     test_paths: List[str]
     summary: Dict[str, object]
+    suppressed_findings: List[Finding] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

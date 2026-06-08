@@ -37,6 +37,20 @@ class CliTests(unittest.TestCase):
             self.assertEqual(data["version"], "2.1.0")
             self.assertEqual(data["runs"][0]["results"][0]["level"], "error")
 
+    def test_baseline_suppresses_known_check_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            diff = root / "patch.diff"
+            baseline = root / "baseline.json"
+            report = root / "report.json"
+            diff.write_text("diff --git a/src/auth/session.py b/src/auth/session.py\n--- a/src/auth/session.py\n+++ b/src/auth/session.py\n@@ -1 +1 @@\n-old\n+new\n", encoding="utf-8")
+            self.assertEqual(0, main(["baseline", "--diff", str(diff), "--output", str(baseline)]))
+            exit_code = main(["check", "--diff", str(diff), "--baseline", str(baseline), "--format", "json", "--output", str(report)])
+            self.assertEqual(exit_code, 0)
+            data = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(data["summary"]["finding_count"], 0)
+            self.assertEqual(data["summary"]["suppressed_finding_count"], 2)
+
     def test_check_returns_zero_when_tests_are_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
