@@ -20,6 +20,7 @@
 - 检测疑似密钥新增，包括 `github_pat_`、`ghp_`、`sk-`、AWS key、private key 和常见 key/value 形态。
 - 检查代码变更缺少测试、高风险类别缺少测试、大补丁、大删改、锁文件或生成物变更。
 - 输出 Markdown、JSON、CSV、SARIF 报告。
+- 输出 remediation Markdown / JSON，把风险 finding 变成可执行修复队列和可复制 agent prompt。
 - SARIF 可直接上传到 GitHub Code Scanning，让 AI 补丁风险出现在仓库安全/代码扫描视图里。
 - `check` 模式可按严重度阈值返回非零退出码，用于 CI。
 - baseline 文件可记录团队已审阅的历史风险，CI 只拦截 AI 补丁引入的新风险。
@@ -64,6 +65,13 @@ aipatchrisk analyze --diff examples/auth-without-tests.diff --format json --outp
 
 ```bash
 aipatchrisk check --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
+```
+
+输出修复计划，交给开发者或下一轮 agent：
+
+```bash
+aipatchrisk analyze --diff examples/auth-without-tests.diff --format remediation --output remediation.md
+aipatchrisk analyze --diff examples/auth-without-tests.diff --format remediation-json --output remediation.json
 ```
 
 检查当前工作区未暂存改动：
@@ -184,6 +192,15 @@ SARIF 报告适合接入 GitHub Code Scanning：
 aipatchrisk check --diff patch.diff --format sarif --output patch-risk.sarif
 ```
 
+Remediation 报告适合贴到 PR、issue 或继续交给 Codex/Claude Code：
+
+```bash
+aipatchrisk analyze --diff patch.diff --format remediation --output remediation.md
+aipatchrisk analyze --diff patch.diff --format remediation-json --output remediation.json
+```
+
+`remediation-json` 使用稳定 schema `ai-patch-risk-checker.remediation.v1`。每个任务包含 `priority`、`owner_hint`、`recommended_action`、`acceptance_criteria`、`agent_prompt` 和 finding `fingerprint`。使用 baseline 后，已复核 finding 不会生成新的修复任务，但 suppressed 数量会保留在摘要里。
+
 baseline 过滤后的 JSON 会保留压制摘要：
 
 ```json
@@ -205,6 +222,7 @@ GitHub Actions 示例：
   run: |
     git diff origin/main...HEAD > patch.diff
     python -m ai_patch_risk_checker.cli check --diff patch.diff --baseline ai-patch-risk-baseline.json --format markdown --output patch-risk.md
+    python -m ai_patch_risk_checker.cli analyze --diff patch.diff --format remediation --output remediation.md
 ```
 
 如果风险级别达到配置中的 `fail_on`，`check` 会返回非零退出码。
@@ -275,6 +293,7 @@ It helps teams using Codex, Claude Code, Cursor, ChatGPT, and similar coding age
 - Categorizes touched paths such as auth, database, payments, dependencies, CI, frontend, and tests.
 - Detects secret-like additions including GitHub PAT shapes, `ghp_`, `sk-`, AWS access keys, private keys, and common key/value assignments.
 - Emits Markdown, JSON, CSV, and SARIF reports.
+- Emits remediation Markdown and JSON with priorities, owner hints, acceptance criteria, and copy-ready agent prompts.
 - Uploads SARIF to GitHub Code Scanning so AI patch risks show up where maintainers already review security and quality alerts.
 - Provides a `check` mode with severity-based exit codes for CI.
 - Supports reviewed baseline files so teams can fail CI only on newly introduced AI patch risks.
@@ -305,6 +324,13 @@ Write SARIF for code scanning:
 aipatchrisk check --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
 ```
 
+Write a remediation queue:
+
+```bash
+aipatchrisk analyze --diff examples/auth-without-tests.diff --format remediation --output remediation.md
+aipatchrisk analyze --diff examples/auth-without-tests.diff --format remediation-json --output remediation.json
+```
+
 Create and use a baseline:
 
 ```bash
@@ -329,6 +355,10 @@ A practical rollout is:
 4. Run CI with `--baseline ai-patch-risk-baseline.json` so only new findings fail the build.
 
 JSON, CSV, Markdown, and SARIF outputs include finding fingerprints. Filtered reports also keep suppressed finding metadata through `suppressed_finding_count` and `suppressed_findings`.
+
+### Remediation Output
+
+`remediation` is a Markdown repair plan for pull requests, issues, and hand-driven agent sessions. `remediation-json` uses the stable schema `ai-patch-risk-checker.remediation.v1` for bots and CI queue tooling. Each task includes `priority`, `owner_hint`, `recommended_action`, `acceptance_criteria`, `agent_prompt`, and the finding `fingerprint`. Baseline-suppressed findings do not become new remediation tasks, but the suppressed count remains visible in the summary.
 
 ### CI
 

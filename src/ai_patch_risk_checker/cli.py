@@ -13,6 +13,7 @@ from .baseline import apply_baseline, load_baseline, render_baseline
 from .config import default_config_json, load_config
 from .diff_parser import parse_unified_diff
 from .report import render_csv, render_json, render_markdown, render_sarif
+from .remediation import render_remediation_json, render_remediation_markdown
 from .rules import analyze_patch, severity_at_least
 
 
@@ -20,7 +21,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
     if args.command == "init-config":
-        Path(args.output).write_text(default_config_json(), encoding="utf-8")
+        write_text(Path(args.output), default_config_json())
         print(f"Wrote config: {args.output}")
         return 0
 
@@ -34,7 +35,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         if args.output == "-":
             print(output, end="")
         elif args.output:
-            Path(args.output).write_text(output, encoding="utf-8")
+            write_text(Path(args.output), output)
             print(f"Wrote baseline: {args.output}")
         else:
             print(output, end="")
@@ -49,7 +50,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     output = render_report(report, args.format)
     if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
+        write_text(Path(args.output), output)
         print(f"Wrote report: {args.output}")
     else:
         print(output, end="")
@@ -71,7 +72,12 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--staged", action="store_true", help="When --git is used, read staged diff.")
         cmd.add_argument("--config", help="Optional JSON config file.")
         cmd.add_argument("--baseline", help="Optional baseline JSON. Matching findings are suppressed before reporting and CI exit checks.")
-        cmd.add_argument("--format", choices=["markdown", "json", "csv", "sarif"], default="markdown", help="Report format.")
+        cmd.add_argument(
+            "--format",
+            choices=["markdown", "json", "csv", "sarif", "remediation", "remediation-json"],
+            default="markdown",
+            help="Report format.",
+        )
         cmd.add_argument("--output", help="Write report to file.")
 
     baseline = sub.add_parser("baseline", help="Write a reviewed baseline JSON from current findings.")
@@ -96,6 +102,11 @@ def read_diff(args: argparse.Namespace) -> str:
     return sys.stdin.read()
 
 
+def write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def render_report(report, format_name: str) -> str:
     if format_name == "json":
         return render_json(report)
@@ -103,6 +114,10 @@ def render_report(report, format_name: str) -> str:
         return render_csv(report)
     if format_name == "sarif":
         return render_sarif(report)
+    if format_name == "remediation":
+        return render_remediation_markdown(report)
+    if format_name == "remediation-json":
+        return render_remediation_json(report)
     return render_markdown(report)
 
 

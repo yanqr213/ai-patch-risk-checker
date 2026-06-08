@@ -35,6 +35,10 @@ jobs:
         run: |
           python -m ai_patch_risk_checker.cli analyze --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
           python -m json.tool patch-risk.sarif > /dev/null
+          python -m ai_patch_risk_checker.cli analyze --diff examples/auth-without-tests.diff --format remediation --output remediation.md
+          test -s remediation.md
+          python -m ai_patch_risk_checker.cli analyze --diff examples/auth-without-tests.diff --format remediation-json --output remediation.json
+          python -m json.tool remediation.json > /dev/null
 
       - name: Run baseline smoke
         run: |

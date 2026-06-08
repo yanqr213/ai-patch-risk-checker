@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 - 2026-06-09
+
+- Added `remediation` Markdown output with prioritized repair tasks, owner hints, acceptance criteria, and copy-ready agent prompts.
+- Added `remediation-json` output with stable schema `ai-patch-risk-checker.remediation.v1` for bots and CI queue tooling.
+- Added CLI, report, and CI smoke coverage for remediation outputs.
+- Expanded Chinese and English README documentation for remediation workflows.
+
 ## 0.3.0 - 2026-06-08
 
 - Added reviewed baseline files for known AI patch risk findings.

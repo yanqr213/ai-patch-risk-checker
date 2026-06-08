@@ -37,6 +37,24 @@ class CliTests(unittest.TestCase):
             self.assertEqual(data["version"], "2.1.0")
             self.assertEqual(data["runs"][0]["results"][0]["level"], "error")
 
+    def test_analyze_writes_remediation_reports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            diff = root / "patch.diff"
+            diff.write_text("diff --git a/src/auth/session.py b/src/auth/session.py\n--- a/src/auth/session.py\n+++ b/src/auth/session.py\n@@ -1 +1 @@\n-old\n+new\n", encoding="utf-8")
+            markdown = root / "reports" / "remediation.md"
+            json_output = root / "reports" / "remediation.json"
+
+            md_code = main(["analyze", "--diff", str(diff), "--format", "remediation", "--output", str(markdown)])
+            json_code = main(["analyze", "--diff", str(diff), "--format", "remediation-json", "--output", str(json_output)])
+
+            self.assertEqual(md_code, 0)
+            self.assertEqual(json_code, 0)
+            self.assertIn("AI Patch Risk Remediation Plan", markdown.read_text(encoding="utf-8"))
+            payload = json.loads(json_output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema"], "ai-patch-risk-checker.remediation.v1")
+            self.assertGreaterEqual(payload["summary"]["task_count"], 1)
+
     def test_baseline_suppresses_known_check_findings(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -65,7 +83,7 @@ class CliTests(unittest.TestCase):
 
     def test_init_config_writes_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            output = Path(tmp) / "config.json"
+            output = Path(tmp) / "nested" / "config.json"
             exit_code = main(["init-config", "--output", str(output)])
             self.assertEqual(exit_code, 0)
             self.assertIn("large_change_lines", output.read_text(encoding="utf-8"))
