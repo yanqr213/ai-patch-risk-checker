@@ -30,3 +30,8 @@ jobs:
 
       - name: Run example check
         run: python -m ai_patch_risk_checker.cli analyze --diff examples/auth-without-tests.diff --format json
+
+      - name: Run SARIF smoke
+        run: |
+          python -m ai_patch_risk_checker.cli analyze --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
+          python -m json.tool patch-risk.sarif > /dev/null

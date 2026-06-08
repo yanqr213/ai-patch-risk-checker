@@ -19,7 +19,8 @@
 - 按路径识别 `auth`、`database`、`payments`、`dependencies`、`ci`、`frontend`、`tests` 等类别。
 - 检测疑似密钥新增，包括 `github_pat_`、`ghp_`、`sk-`、AWS key、private key 和常见 key/value 形态。
 - 检查代码变更缺少测试、高风险类别缺少测试、大补丁、大删改、锁文件或生成物变更。
-- 输出 Markdown、JSON、CSV 报告。
+- 输出 Markdown、JSON、CSV、SARIF 报告。
+- SARIF 可直接上传到 GitHub Code Scanning，让 AI 补丁风险出现在仓库安全/代码扫描视图里。
 - `check` 模式可按严重度阈值返回非零退出码，用于 CI。
 - JSON 配置可覆盖阈值、类别路径和需要测试的类别。
 - 仅使用 Python 标准库，无需网络。
@@ -56,6 +57,12 @@ aipatchrisk analyze --diff examples/auth-without-tests.diff
 
 ```bash
 aipatchrisk analyze --diff examples/auth-without-tests.diff --format json --output report.json
+```
+
+输出 SARIF，供 GitHub Code Scanning 或其他安全平台读取：
+
+```bash
+aipatchrisk check --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
 ```
 
 检查当前工作区未暂存改动：
@@ -143,6 +150,12 @@ CSV 报告适合导入表格或审计台账：
 aipatchrisk analyze --diff patch.diff --format csv --output findings.csv
 ```
 
+SARIF 报告适合接入 GitHub Code Scanning：
+
+```bash
+aipatchrisk check --diff patch.diff --format sarif --output patch-risk.sarif
+```
+
 ## CI 用法
 
 GitHub Actions 示例：
@@ -155,6 +168,33 @@ GitHub Actions 示例：
 ```
 
 如果风险级别达到配置中的 `fail_on`，`check` 会返回非零退出码。
+
+上传 SARIF 到 GitHub Code Scanning：
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - uses: actions/setup-python@v5
+    with:
+      python-version: "3.12"
+  - run: python -m pip install git+https://github.com/yanqr213/ai-patch-risk-checker.git
+  - name: Build patch risk SARIF
+    run: |
+      git diff origin/main...HEAD > patch.diff
+      aipatchrisk check --diff patch.diff --format sarif --output patch-risk.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: patch-risk.sarif
+```
+
+如果你只想把报告上传但暂不阻断合并，可以在 `ai-patch-risk.json` 中把 `fail_on` 设为 `critical`，或把 `check` 换成 `analyze`。
 
 ## 隐私与安全
 
@@ -184,7 +224,8 @@ It helps teams using Codex, Claude Code, Cursor, ChatGPT, and similar coding age
 - Parses changed files, statuses, additions, deletions, and added/deleted lines.
 - Categorizes touched paths such as auth, database, payments, dependencies, CI, frontend, and tests.
 - Detects secret-like additions including GitHub PAT shapes, `ghp_`, `sk-`, AWS access keys, private keys, and common key/value assignments.
-- Emits Markdown, JSON, and CSV reports.
+- Emits Markdown, JSON, CSV, and SARIF reports.
+- Uploads SARIF to GitHub Code Scanning so AI patch risks show up where maintainers already review security and quality alerts.
 - Provides a `check` mode with severity-based exit codes for CI.
 - Uses only the Python standard library and does not require network access.
 
@@ -207,6 +248,12 @@ Create a config:
 aipatchrisk init-config --output ai-patch-risk.json
 ```
 
+Write SARIF for code scanning:
+
+```bash
+aipatchrisk check --diff examples/auth-without-tests.diff --format sarif --output patch-risk.sarif
+```
+
 ### CI
 
 ```bash
@@ -215,6 +262,31 @@ python -m ai_patch_risk_checker.cli check --diff patch.diff --format json --outp
 ```
 
 `check` returns a non-zero exit code when the highest finding severity is at or above `fail_on`.
+
+GitHub Code Scanning example:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - uses: actions/setup-python@v5
+    with:
+      python-version: "3.12"
+  - run: python -m pip install git+https://github.com/yanqr213/ai-patch-risk-checker.git
+  - name: Build patch risk SARIF
+    run: |
+      git diff origin/main...HEAD > patch.diff
+      aipatchrisk check --diff patch.diff --format sarif --output patch-risk.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: patch-risk.sarif
+```
 
 ### Security Notes
 

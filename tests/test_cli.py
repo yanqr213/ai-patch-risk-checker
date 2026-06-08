@@ -25,6 +25,18 @@ class CliTests(unittest.TestCase):
             exit_code = main(["check", "--diff", str(diff), "--format", "json"])
             self.assertEqual(exit_code, 1)
 
+    def test_check_writes_sarif_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            diff = root / "patch.diff"
+            diff.write_text("diff --git a/src/auth/session.py b/src/auth/session.py\n--- a/src/auth/session.py\n+++ b/src/auth/session.py\n@@ -1 +1 @@\n-old\n+new\n", encoding="utf-8")
+            output = root / "patch-risk.sarif"
+            exit_code = main(["check", "--diff", str(diff), "--format", "sarif", "--output", str(output)])
+            self.assertEqual(exit_code, 1)
+            data = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(data["version"], "2.1.0")
+            self.assertEqual(data["runs"][0]["results"][0]["level"], "error")
+
     def test_check_returns_zero_when_tests_are_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

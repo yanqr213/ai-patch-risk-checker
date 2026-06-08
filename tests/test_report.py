@@ -3,7 +3,7 @@ import unittest
 
 from ai_patch_risk_checker.config import DEFAULT_CONFIG, default_config_json, load_config
 from ai_patch_risk_checker.diff_parser import parse_unified_diff
-from ai_patch_risk_checker.report import render_csv, render_json, render_markdown
+from ai_patch_risk_checker.report import render_csv, render_json, render_markdown, render_sarif
 from ai_patch_risk_checker.rules import analyze_patch
 
 
@@ -24,6 +24,14 @@ class ReportTests(unittest.TestCase):
     def test_render_csv_has_header(self):
         csv = render_csv(self.report)
         self.assertTrue(csv.startswith("severity,code,message"))
+
+    def test_render_sarif_has_code_scanning_shape(self):
+        sarif = json.loads(render_sarif(self.report))
+        run = sarif["runs"][0]
+        self.assertEqual(sarif["version"], "2.1.0")
+        self.assertEqual(run["tool"]["driver"]["name"], "ai-patch-risk-checker")
+        self.assertEqual(run["results"][0]["ruleId"], "code_without_tests")
+        self.assertEqual(run["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"], "src/app.py")
 
     def test_default_config_json_is_loadable(self):
         data = json.loads(default_config_json())

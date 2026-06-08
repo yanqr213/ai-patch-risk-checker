@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-patch-risk-checker"
-version = "0.1.0"
+version = "0.2.0"
 description = "Offline CLI for reviewing AI-generated patch risk before PRs and CI merges."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -24,6 +24,12 @@ classifiers = [
   "Topic :: Software Development :: Version Control",
   "Topic :: Utilities"
 ]
+
+[project.urls]
+Homepage = "https://github.com/yanqr213/ai-patch-risk-checker"
+Repository = "https://github.com/yanqr213/ai-patch-risk-checker"
+Issues = "https://github.com/yanqr213/ai-patch-risk-checker/issues"
+Changelog = "https://github.com/yanqr213/ai-patch-risk-checker/blob/main/CHANGELOG.md"
 
 [project.scripts]
 aipatchrisk = "ai_patch_risk_checker.cli:main"

@@ -11,7 +11,7 @@ from typing import Iterable
 from . import __version__
 from .config import default_config_json, load_config
 from .diff_parser import parse_unified_diff
-from .report import render_csv, render_json, render_markdown
+from .report import render_csv, render_json, render_markdown, render_sarif
 from .rules import analyze_patch, severity_at_least
 
 
@@ -55,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--git", action="store_true", help="Read diff from `git diff --cached` or `git diff`.")
         cmd.add_argument("--staged", action="store_true", help="When --git is used, read staged diff.")
         cmd.add_argument("--config", help="Optional JSON config file.")
-        cmd.add_argument("--format", choices=["markdown", "json", "csv"], default="markdown", help="Report format.")
+        cmd.add_argument("--format", choices=["markdown", "json", "csv", "sarif"], default="markdown", help="Report format.")
         cmd.add_argument("--output", help="Write report to file.")
 
     init = sub.add_parser("init-config", help="Write a default JSON config.")
@@ -78,6 +78,8 @@ def render_report(report, format_name: str) -> str:
         return render_json(report)
     if format_name == "csv":
         return render_csv(report)
+    if format_name == "sarif":
+        return render_sarif(report)
     return render_markdown(report)
 
 
